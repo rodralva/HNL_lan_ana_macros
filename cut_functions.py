@@ -1,5 +1,6 @@
 import numpy as np
 import awkward as ak
+import math
 
 #templates for slc-lvl defined variables
 
@@ -90,3 +91,58 @@ def cut_pfp_razzled_pion_score(g,score=0.8):
             gg["CUTS"]*=~above 
         return g
     else: raise Exception("Not implemented");
+
+def cut_shower_angle(g,value=30):
+    #probably not the best way to do it
+    value=math.cos(math.radians(value))
+    
+    if type(g)==tuple:# multiple files
+        for gg in g:
+            v_x=ak.flatten(gg["events"]["slc_pfp_shower_dir_x"].array())
+            v_y=ak.flatten(gg["events"]["slc_pfp_shower_dir_y"].array())
+            v_z=ak.flatten(gg["events"]["slc_pfp_shower_dir_z"].array())
+            mod=np.sqrt(v_x**2+v_y**2+v_z**2)
+            
+            angle=v_z/mod
+            good=np.array(ak.sum(angle>value,axis=1),dtype=bool)
+
+            gg["CUTS"]*=good 
+        return g
+        # return g
+    else: raise Exception("Not implemented");
+
+#Lan's between buckets, should prob optimize someday
+def cutBetweenBucket(g):
+    if type(g)==tuple:# multiple files
+        for gg in g:
+
+            opt0_time=ak.flatten(gg["events"]["slc_opt0_time_corrected_Z_pandora"].array())*1000 #in ns
+            lb_arr, ub_arr = make_interval(373, 383)
+            good =[checkInterval(x, lb_arr, ub_arr) for x in opt0_time]
+            good = np.array(good,dtype=bool)
+            gg["CUTS"]*= good
+        return opt0_time,good
+    else: raise Exception("Not implemented");
+
+    
+def make_interval(lb_val, ub_val):
+
+    lb_arr = []
+    ub_arr = []   
+    
+    #construct the lower/upper bound array
+    for idx in range(0,81):
+        lb_arr.append(lb_val+19*idx)
+        ub_arr.append(ub_val+19*idx)
+    return lb_arr, ub_arr
+
+
+def checkInterval(x, lb_arr, ub_arr):
+
+    isIn = False
+
+    for lb, ub in zip(lb_arr, ub_arr):
+        if lb <= x <= ub:
+            isIn = True
+            break
+    return isIn
